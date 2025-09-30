@@ -3,11 +3,6 @@
 import cors from "cors";
 import { parseArgs } from "node:util";
 import { parse as shellParseArgs } from "shell-quote";
-import nodeFetch, { Headers as NodeHeaders } from "node-fetch";
-
-// Type-compatible wrappers for node-fetch to work with browser-style types
-const fetch = nodeFetch;
-const Headers = NodeHeaders;
 
 import {
   SSEClientTransport,
@@ -25,6 +20,7 @@ import express from "express";
 import { findActualExecutable } from "spawn-rx";
 import mcpProxy from "./mcpProxy.js";
 import { randomUUID, randomBytes, timingSafeEqual } from "node:crypto";
+import { ClaudeBackfillService } from "./claudeBackfill.js";
 
 const DEFAULT_MCP_PROXY_LISTEN_PORT = "6277";
 
@@ -160,6 +156,12 @@ const sessionToken =
   process.env.MCP_PROXY_AUTH_TOKEN || randomBytes(32).toString("hex");
 const authDisabled = !!process.env.DANGEROUSLY_OMIT_AUTH;
 
+// Initialize Claude API backfill service
+const claudeBackfillService = new ClaudeBackfillService({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  enabled: process.env.CLAUDE_BACKFILL_ENABLED !== "false", // Enabled by default if API key is available
+});
+
 // Origin validation middleware to prevent DNS rebinding attacks
 const originValidationMiddleware = (
   req: express.Request,
@@ -283,7 +285,7 @@ const createCustomFetch = (headerHolder: { headers: HeadersInit }) => {
 
     // Convert Headers to a plain object for node-fetch compatibility
     const headersObject: Record<string, string> = {};
-    finalHeaders.forEach((value, key) => {
+    finalHeaders.forEach((value: string, key: string) => {
       headersObject[key] = value;
     });
 
@@ -487,6 +489,7 @@ app.post(
         mcpProxy({
           transportToClient: webAppTransport,
           transportToServer: serverTransport,
+          claudeBackfillService,
         });
 
         await (webAppTransport as StreamableHTTPServerTransport).handleRequest(
@@ -633,6 +636,7 @@ app.get(
       mcpProxy({
         transportToClient: webAppTransport,
         transportToServer: serverTransport,
+        claudeBackfillService,
       });
     } catch (error) {
       if (error instanceof SseError && error.code === 401) {
@@ -679,6 +683,7 @@ app.get(
       mcpProxy({
         transportToClient: webAppTransport,
         transportToServer: serverTransport,
+        claudeBackfillService,
       });
     } catch (error) {
       if (error instanceof SseError && error.code === 401) {

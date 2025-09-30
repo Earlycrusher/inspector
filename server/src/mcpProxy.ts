@@ -1,5 +1,6 @@
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { isJSONRPCRequest } from "@modelcontextprotocol/sdk/types.js";
+import { ClaudeBackfillService, createClaudeBackfillProxy } from "./claudeBackfill.js";
 
 function onClientError(error: Error) {
   console.error("Error from inspector client:", error);
@@ -18,45 +19,59 @@ function onServerError(error: Error) {
 export default function mcpProxy({
   transportToClient,
   transportToServer,
+  claudeBackfillService,
 }: {
   transportToClient: Transport;
   transportToServer: Transport;
+  claudeBackfillService?: ClaudeBackfillService;
 }) {
   let transportToClientClosed = false;
   let transportToServerClosed = false;
 
   let reportedServerSession = false;
 
-  transportToClient.onmessage = (message) => {
-    transportToServer.send(message).catch((error) => {
-      // Send error response back to client if it was a request (has id) and connection is still open
-      if (isJSONRPCRequest(message) && !transportToClientClosed) {
-        const errorResponse = {
-          jsonrpc: "2.0" as const,
-          id: message.id,
-          error: {
-            code: -32001,
-            message: error.message,
-            data: error,
-          },
-        };
-        transportToClient.send(errorResponse).catch(onClientError);
-      }
-    });
-  };
+  // Apply Claude backfill proxy if available
+  if (claudeBackfillService && claudeBackfillService.isEnabled()) {
+    console.log("Claude API backfill enabled for sampling requests");
+    const backfillProxy = createClaudeBackfillProxy(transportToClient, transportToServer, claudeBackfillService);
+    // The backfill proxy modifies the transport onmessage handlers
+  } else {
+    // Original message forwarding logic
+    setupOriginalMessageForwarding();
+  }
 
-  transportToServer.onmessage = (message) => {
-    if (!reportedServerSession) {
-      if (transportToServer.sessionId) {
-        // Can only report for StreamableHttp
-        console.error(
-          "Proxy  <-> Server sessionId: " + transportToServer.sessionId,
-        );
+  function setupOriginalMessageForwarding() {
+    transportToClient.onmessage = (message) => {
+      transportToServer.send(message).catch((error) => {
+        // Send error response back to client if it was a request (has id) and connection is still open
+        if (isJSONRPCRequest(message) && !transportToClientClosed) {
+          const errorResponse = {
+            jsonrpc: "2.0" as const,
+            id: message.id,
+            error: {
+              code: -32001,
+              message: error.message,
+              data: error,
+            },
+          };
+          transportToClient.send(errorResponse).catch(onClientError);
+        }
+      });
+    };
+
+    transportToServer.onmessage = (message) => {
+      if (!reportedServerSession) {
+        if (transportToServer.sessionId) {
+          // Can only report for StreamableHttp
+          console.error(
+            "Proxy  <-> Server sessionId: " + transportToServer.sessionId,
+          );
+        }
+        reportedServerSession = true;
       }
-      reportedServerSession = true;
-    }
-    transportToClient.send(message).catch(onClientError);
-  };
+      transportToClient.send(message).catch(onClientError);
+    };
+  }
 
   transportToClient.onclose = () => {
     if (transportToServerClosed) {
