@@ -137,6 +137,10 @@ const App = () => {
     return localStorage.getItem("lastOauthClientId") || "";
   });
 
+  const [oauthClientSecret, setOauthClientSecret] = useState<string>(() => {
+    return localStorage.getItem("lastOauthClientSecret") || "";
+  });
+
   const [oauthScope, setOauthScope] = useState<string>(() => {
     return localStorage.getItem("lastOauthScope") || "";
   });
@@ -389,6 +393,10 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem("lastOauthClientId", oauthClientId);
   }, [oauthClientId]);
+
+  useEffect(() => {
+    localStorage.setItem("lastOauthClientSecret", oauthClientSecret);
+  }, [oauthClientSecret]);
 
   useEffect(() => {
     localStorage.setItem("lastOauthScope", oauthScope);
@@ -900,6 +908,8 @@ const App = () => {
           setCustomHeaders={setCustomHeaders}
           oauthClientId={oauthClientId}
           setOauthClientId={setOauthClientId}
+          oauthClientSecret={oauthClientSecret}
+          setOauthClientSecret={setOauthClientSecret}
           oauthScope={oauthScope}
           setOauthScope={setOauthScope}
           onConnect={connectMcpServer}

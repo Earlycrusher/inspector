@@ -58,6 +58,8 @@ interface SidebarProps {
   setCustomHeaders: (headers: CustomHeadersType) => void;
   oauthClientId: string;
   setOauthClientId: (id: string) => void;
+  oauthClientSecret: string;
+  setOauthClientSecret: (secret: string) => void;
   oauthScope: string;
   setOauthScope: (scope: string) => void;
   onConnect: () => void;
@@ -87,6 +89,8 @@ const Sidebar = ({
   setCustomHeaders,
   oauthClientId,
   setOauthClientId,
+  oauthClientSecret,
+  setOauthClientSecret,
   oauthScope,
   setOauthScope,
   onConnect,
@@ -553,6 +557,17 @@ const Sidebar = ({
                         onChange={(e) => setOauthClientId(e.target.value)}
                         value={oauthClientId}
                         data-testid="oauth-client-id-input"
+                        className="font-mono"
+                      />
+                      <label className="text-sm font-medium">
+                        Client Secret
+                      </label>
+                      <Input
+                        type="password"
+                        placeholder="Client Secret"
+                        onChange={(e) => setOauthClientSecret(e.target.value)}
+                        value={oauthClientSecret}
+                        data-testid="oauth-client-secret-input"
                         className="font-mono"
                       />
                       <label className="text-sm font-medium">
